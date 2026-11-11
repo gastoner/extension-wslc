@@ -49,6 +49,8 @@ const testBridgeConfiguration: BridgeConfiguration = {
   startupTimeoutMs: 5_000,
   requestTimeoutMs: 1_000,
   shutdownTimeoutMs: 100,
+  maxConsecutiveStartupFailures: 3,
+  refreshIntervalMs: 30_000,
 };
 
 class FakePingResponse extends EventEmitter implements BridgePingResponse {
