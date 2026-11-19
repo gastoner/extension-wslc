@@ -17,9 +17,11 @@
  ***********************************************************************/
 
 import { resolve } from 'node:path';
+import { podmanDesktopApiMockPlugin } from '@podman-desktop/api-mocks-vitest/plugin';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  plugins: [podmanDesktopApiMockPlugin()],
   resolve: {
     alias: {
       '/@/': `${resolve(import.meta.dirname, 'src')}/`,
