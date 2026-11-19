@@ -25,6 +25,11 @@ const packageRoot = import.meta.dirname;
 
 export default defineConfig({
   root: packageRoot,
+  resolve: {
+    alias: {
+      '/@/': `${join(packageRoot, 'src')}/`,
+    },
+  },
   build: {
     sourcemap: true,
     target: 'es2022',
