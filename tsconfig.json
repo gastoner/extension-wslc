@@ -13,7 +13,10 @@
     "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "paths": {
+      "/@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*.ts", "vite.config.ts", "vitest.config.ts"]
 }
