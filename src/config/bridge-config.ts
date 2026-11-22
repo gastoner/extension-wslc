@@ -20,8 +20,16 @@ export const BridgeConfiguration = Symbol.for('BridgeConfiguration');
 
 export interface BridgeConfiguration {
   readonly pipeName: string;
+  readonly executableName: string;
+  readonly startupTimeoutMs: number;
+  readonly requestTimeoutMs: number;
+  readonly shutdownTimeoutMs: number;
 }
 
 export const bridgeConfiguration: BridgeConfiguration = {
   pipeName: String.raw`\\.\pipe\wslc_engine`,
+  executableName: 'wslc-bridge.exe',
+  startupTimeoutMs: 180_000,
+  requestTimeoutMs: 5_000,
+  shutdownTimeoutMs: 10_000,
 };

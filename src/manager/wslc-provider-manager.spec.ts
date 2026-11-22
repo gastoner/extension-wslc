@@ -28,6 +28,10 @@ const extensionContext = { subscriptions: [] } as unknown as ExtensionContext;
 const telemetryLogger = { logError: vi.fn(), logUsage: vi.fn() } as unknown as TelemetryLogger;
 const bridgeConfiguration: BridgeConfiguration = {
   pipeName: String.raw`\\.\pipe\wslc_test_engine`,
+  executableName: 'wslc-bridge.exe',
+  startupTimeoutMs: 500,
+  requestTimeoutMs: 200,
+  shutdownTimeoutMs: 50,
 };
 const connectionDisposable = { dispose: vi.fn() } as unknown as Disposable;
 const wslcProvider = {
