@@ -24,6 +24,8 @@ export interface BridgeConfiguration {
   readonly startupTimeoutMs: number;
   readonly requestTimeoutMs: number;
   readonly shutdownTimeoutMs: number;
+  readonly maxConsecutiveStartupFailures: number;
+  readonly refreshIntervalMs: number;
 }
 
 export const bridgeConfiguration: BridgeConfiguration = {
@@ -32,4 +34,6 @@ export const bridgeConfiguration: BridgeConfiguration = {
   startupTimeoutMs: 180_000,
   requestTimeoutMs: 5_000,
   shutdownTimeoutMs: 10_000,
+  maxConsecutiveStartupFailures: 3,
+  refreshIntervalMs: 30_000,
 };
