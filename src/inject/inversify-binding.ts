@@ -18,6 +18,7 @@
 
 import type { ExtensionContext, TelemetryLogger } from '@podman-desktop/api';
 import { Container } from 'inversify';
+import { managersModule } from '/@/manager/manager-module';
 import { ExtensionContextSymbol, TelemetryLoggerSymbol } from './symbol';
 
 export class InversifyBinding {
@@ -34,6 +35,7 @@ export class InversifyBinding {
     this.#container = new Container();
     this.#container.bind(ExtensionContextSymbol).toConstantValue(this.#extensionContext);
     this.#container.bind(TelemetryLoggerSymbol).toConstantValue(this.#telemetryLogger);
+    await this.#container.loadAsync(managersModule);
     return this.#container;
   }
 

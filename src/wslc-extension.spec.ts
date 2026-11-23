@@ -18,14 +18,19 @@
 
 import type { ExtensionContext, TelemetryLogger } from '@podman-desktop/api';
 import { env } from '@podman-desktop/api';
+import { Container } from 'inversify';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { bridgeConfiguration } from '/@/config/bridge-config';
 import { InversifyBinding } from '/@/inject/inversify-binding';
+import { WslcProviderManager } from '/@/manager/wslc-provider-manager';
 import { WslcExtension } from './wslc-extension';
 
 vi.mock(import('/@/inject/inversify-binding'));
+vi.mock(import('/@/manager/wslc-provider-manager'));
 
 let extensionContext: ExtensionContext;
 let telemetryLogger: TelemetryLogger;
+let providerManager: WslcProviderManager;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -56,16 +61,20 @@ beforeEach(() => {
   };
   vi.mocked(env).isWindows = true;
   vi.mocked(env.createTelemetryLogger).mockReturnValue(telemetryLogger);
+  providerManager = new WslcProviderManager(extensionContext, telemetryLogger, bridgeConfiguration);
+  const container = new Container();
+  container.bind(WslcProviderManager).toConstantValue(providerManager);
+  vi.mocked(InversifyBinding.prototype.init).mockResolvedValue(container);
 });
 
 describe('WslcExtension', () => {
-  test('initializes bindings and reports activation on Windows', async () => {
+  test('registers the provider and reports activation on Windows', async () => {
     const extension = new WslcExtension(extensionContext);
 
     await extension.activate();
 
     expect(InversifyBinding).toHaveBeenCalledWith(extensionContext, telemetryLogger);
-    expect(InversifyBinding.prototype.init).toHaveBeenCalledOnce();
+    expect(providerManager.registerContainerProvider).toHaveBeenCalledOnce();
     expect(telemetryLogger.logUsage).toHaveBeenCalledWith('activated');
   });
 
@@ -86,14 +95,16 @@ describe('WslcExtension', () => {
     expect(console.warn).toHaveBeenCalledWith('WSL Containers extension not started: can only be activated on Windows');
     expect(env.createTelemetryLogger).not.toHaveBeenCalled();
     expect(InversifyBinding).not.toHaveBeenCalled();
+    expect(providerManager.registerContainerProvider).not.toHaveBeenCalled();
   });
 
-  test('disposes bindings when the extension is deactivated', async () => {
+  test('deactivates the provider manager and disposes bindings when the extension is deactivated', async () => {
     const extension = new WslcExtension(extensionContext);
     await extension.activate();
 
     await extension.deactivate();
 
+    expect(providerManager.deactivate).toHaveBeenCalledOnce();
     expect(InversifyBinding.prototype.dispose).toHaveBeenCalledOnce();
   });
 
