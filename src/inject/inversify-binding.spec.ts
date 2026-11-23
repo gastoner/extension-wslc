@@ -20,6 +20,7 @@ import type { ExtensionContext, TelemetryLogger } from '@podman-desktop/api';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { InversifyBinding } from './inversify-binding';
 import { ExtensionContextSymbol, TelemetryLoggerSymbol } from './symbol';
+import { WslVersionService } from '/@/manager/wsl-version-service';
 import { WslcProviderManager } from '/@/manager/wslc-provider-manager';
 
 let extensionContext: ExtensionContext;
@@ -59,6 +60,7 @@ describe('InversifyBinding', () => {
 
     expect(container.get(ExtensionContextSymbol)).toBe(extensionContext);
     expect(container.get(TelemetryLoggerSymbol)).toBe(telemetryLogger);
+    expect(container.get(WslVersionService)).toBeInstanceOf(WslVersionService);
     expect(container.get(WslcProviderManager)).toBeInstanceOf(WslcProviderManager);
   });
 
@@ -69,6 +71,7 @@ describe('InversifyBinding', () => {
 
     expect(container.isBound(ExtensionContextSymbol)).toBeFalsy();
     expect(container.isBound(TelemetryLoggerSymbol)).toBeFalsy();
+    expect(container.isBound(WslVersionService)).toBeFalsy();
     expect(container.isBound(WslcProviderManager)).toBeFalsy();
   });
 

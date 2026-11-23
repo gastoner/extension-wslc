@@ -20,22 +20,29 @@ import {
   type ContainerProviderConnection,
   type Disposable,
   type ExtensionContext,
+  type Logger,
   type Provider,
   type ProviderConnectionStatus,
+  type ProviderInstallation,
+  process as podmanProcess,
   provider,
   type TelemetryLogger,
 } from '@podman-desktop/api';
 import { inject, injectable } from 'inversify';
 import { BridgeConfiguration } from '/@/config/bridge-config';
 import { ExtensionContextSymbol, TelemetryLoggerSymbol } from '/@/inject/symbol';
+import { WslVersionService } from './wsl-version-service';
 import { WslcBridgeManager } from './wslc-bridge-manager';
 
 @injectable()
 export class WslcProviderManager {
   static readonly PROVIDER_ID = 'wslc';
+  protected static readonly WSLC_EXECUTABLE = 'wslc.exe';
 
   #wslcProvider: Provider | undefined;
   #connectionDisposable: Disposable | undefined;
+  #installationDisposable: Disposable | undefined;
+  #updateDisposable: Disposable | undefined;
   #connectionStatus: ProviderConnectionStatus = 'stopped';
   #refreshTimer: NodeJS.Timeout | undefined;
   #refreshPromise: Promise<void> | undefined;
@@ -48,6 +55,7 @@ export class WslcProviderManager {
     @inject(TelemetryLoggerSymbol) private readonly telemetryLogger: TelemetryLogger,
     @inject(BridgeConfiguration) private readonly configuration: BridgeConfiguration,
     @inject(WslcBridgeManager) private readonly wslcBridgeManager: WslcBridgeManager,
+    @inject(WslVersionService) private readonly wslVersionService: WslVersionService,
   ) {}
 
   registerContainerProvider(): Promise<void> {
@@ -61,7 +69,7 @@ export class WslcProviderManager {
     const wslcProvider = provider.createProvider({
       name: 'WSL Containers',
       id: WslcProviderManager.PROVIDER_ID,
-      status: 'installed',
+      status: 'unknown',
       images: {
         icon: './icon.png',
         logo: './icon.png',
@@ -78,6 +86,80 @@ export class WslcProviderManager {
 
   async updateContainerSystemStatus(wslcProvider: Provider): Promise<void> {
     if (this.#stopMonitoringStatus) {
+      return;
+    }
+
+    let runtimeVersion: string;
+    try {
+      const { stdout } = await podmanProcess.exec(WslcProviderManager.WSLC_EXECUTABLE, ['version']);
+      runtimeVersion = String(stdout).trim();
+    } catch (error: unknown) {
+      await this.cleanupConnection();
+      await this.stopBridge();
+      this.disposeUpdate();
+      this.disposeInstallation();
+      if (this.isMissingExecutable(error)) {
+        wslcProvider.updateVersion();
+        wslcProvider.updateStatus('not-installed');
+        this.registerInstallation();
+        console.error('WSL Containers runtime executable is not installed', error);
+        return;
+      }
+
+      wslcProvider.updateStatus('error');
+      console.error('Error checking WSL Containers version', error);
+      return;
+    }
+
+    if (!runtimeVersion || !/\d+(?:\.\d+){1,3}/.test(runtimeVersion)) {
+      await this.cleanupConnection();
+      await this.stopBridge();
+      this.disposeInstallation();
+      this.disposeUpdate();
+      wslcProvider.updateStatus('error');
+      console.error('WSL Containers version output was empty or malformed', runtimeVersion);
+      return;
+    }
+
+    this.disposeInstallation();
+    wslcProvider.updateStatus('installed');
+    this.telemetryLogger.logUsage('runtimeDetected', { version: runtimeVersion });
+
+    let wslVersion: string | undefined;
+    try {
+      const result = await podmanProcess.exec('wsl', ['--version'], { encoding: 'utf16le' });
+      wslVersion = this.wslVersionService.parseWslVersion(String(result.stdout));
+    } catch (error: unknown) {
+      console.warn('WSL version could not be detected', error);
+    }
+
+    if (!wslVersion) {
+      await this.cleanupConnection();
+      await this.stopBridge();
+      this.disposeUpdate();
+      wslcProvider.updateStatus('error');
+      console.warn('WSL version output could not be parsed');
+      return;
+    }
+
+    wslcProvider.updateVersion(wslVersion);
+    if (!this.wslVersionService.isSupportedWslVersion(wslVersion)) {
+      await this.cleanupConnection();
+      await this.stopBridge();
+      this.registerUpdate();
+      wslcProvider.updateStatus('installed');
+      return;
+    }
+
+    this.disposeUpdate();
+
+    try {
+      await podmanProcess.exec(WslcProviderManager.WSLC_EXECUTABLE, ['container', 'list']);
+    } catch (error: unknown) {
+      await this.cleanupConnection();
+      await this.stopBridge();
+      wslcProvider.updateStatus('stopped');
+      console.error('Error checking WSL Containers runtime status', error);
       return;
     }
 
@@ -178,10 +260,81 @@ export class WslcProviderManager {
       this.#refreshTimer = undefined;
     }
     await this.#refreshPromise;
+    this.disposeInstallation();
+    this.disposeUpdate();
     await this.cleanupConnection();
     await this.stopBridge();
     this.#wslcProvider = undefined;
     this.#abortController = undefined;
+  }
+
+  private registerUpdate(): void {
+    if (this.#updateDisposable || !this.#wslcProvider) {
+      return;
+    }
+
+    const update = {
+      version: this.wslVersionService.minimumVersion,
+      update: async (logger: Logger): Promise<void> => {
+        await this.updateWsl(logger, `Updating WSL to ${this.wslVersionService.minimumVersion} or newer`);
+      },
+    };
+    this.#updateDisposable = this.#wslcProvider.registerUpdate(update);
+    this.extensionContext.subscriptions.push(this.#updateDisposable);
+  }
+
+  private registerInstallation(): void {
+    if (this.#installationDisposable || !this.#wslcProvider) {
+      return;
+    }
+
+    const installation: ProviderInstallation = {
+      install: async (logger: Logger): Promise<void> => {
+        await this.updateWsl(logger, 'Installing WSL Containers prerequisites with wsl --update');
+      },
+    };
+    this.#installationDisposable = this.#wslcProvider.registerInstallation(installation);
+    this.extensionContext.subscriptions.push(this.#installationDisposable);
+  }
+
+  private async updateWsl(logger: Logger, message: string): Promise<void> {
+    logger.log(message);
+    await podmanProcess.exec('wsl', ['--update'], { encoding: 'utf16le' });
+    await this.#refreshPromise;
+    await this.refresh();
+  }
+
+  private isMissingExecutable(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      /ENOENT|not found|not recognized as an internal or external command|cannot find the file specified/i.test(
+        error.message,
+      )
+    );
+  }
+
+  private disposeInstallation(): void {
+    const installationDisposable = this.#installationDisposable;
+    installationDisposable?.dispose();
+    if (installationDisposable) {
+      const index = this.extensionContext.subscriptions.indexOf(installationDisposable);
+      if (index >= 0) {
+        this.extensionContext.subscriptions.splice(index, 1);
+      }
+    }
+    this.#installationDisposable = undefined;
+  }
+
+  private disposeUpdate(): void {
+    const updateDisposable = this.#updateDisposable;
+    updateDisposable?.dispose();
+    if (updateDisposable) {
+      const index = this.extensionContext.subscriptions.indexOf(updateDisposable);
+      if (index >= 0) {
+        this.extensionContext.subscriptions.splice(index, 1);
+      }
+    }
+    this.#updateDisposable = undefined;
   }
 
   private async ensureBridge(): Promise<void> {
