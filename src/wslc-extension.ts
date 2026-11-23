@@ -18,10 +18,12 @@
 
 import { env, type ExtensionContext } from '@podman-desktop/api';
 import { InversifyBinding } from '/@/inject/inversify-binding';
+import { WslcProviderManager } from '/@/manager/wslc-provider-manager';
 
 export class WslcExtension {
   readonly #extensionContext: ExtensionContext;
   #inversifyBinding: InversifyBinding | undefined;
+  #providerManager: WslcProviderManager | undefined;
 
   constructor(extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
@@ -36,13 +38,17 @@ export class WslcExtension {
     const telemetryLogger = env.createTelemetryLogger();
     this.#extensionContext.subscriptions.push(telemetryLogger);
     this.#inversifyBinding = new InversifyBinding(this.#extensionContext, telemetryLogger);
-    await this.#inversifyBinding.init();
+    const container = await this.#inversifyBinding.init();
+    this.#providerManager = await container.getAsync(WslcProviderManager);
+    await this.#providerManager.registerContainerProvider();
 
     console.log('WSL Containers extension activated on Windows');
     telemetryLogger.logUsage('activated');
   }
 
   async deactivate(): Promise<void> {
+    await this.#providerManager?.deactivate();
+    this.#providerManager = undefined;
     await this.#inversifyBinding?.dispose();
     this.#inversifyBinding = undefined;
   }
