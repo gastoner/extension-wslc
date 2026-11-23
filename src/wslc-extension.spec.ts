@@ -22,6 +22,7 @@ import { Container } from 'inversify';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { bridgeConfiguration } from '/@/config/bridge-config';
 import { InversifyBinding } from '/@/inject/inversify-binding';
+import { WslVersionService } from '/@/manager/wsl-version-service';
 import { WslcBridgeManager } from '/@/manager/wslc-bridge-manager';
 import { WslcProviderManager } from '/@/manager/wslc-provider-manager';
 import { WslcExtension } from './wslc-extension';
@@ -67,6 +68,7 @@ beforeEach(() => {
     telemetryLogger,
     bridgeConfiguration,
     new WslcBridgeManager(extensionContext, bridgeConfiguration),
+    new WslVersionService(),
   );
   const container = new Container();
   container.bind(WslcProviderManager).toConstantValue(providerManager);
