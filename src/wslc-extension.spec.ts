@@ -22,6 +22,7 @@ import { Container } from 'inversify';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { bridgeConfiguration } from '/@/config/bridge-config';
 import { InversifyBinding } from '/@/inject/inversify-binding';
+import { WslcBridgeManager } from '/@/manager/wslc-bridge-manager';
 import { WslcProviderManager } from '/@/manager/wslc-provider-manager';
 import { WslcExtension } from './wslc-extension';
 
@@ -61,7 +62,12 @@ beforeEach(() => {
   };
   vi.mocked(env).isWindows = true;
   vi.mocked(env.createTelemetryLogger).mockReturnValue(telemetryLogger);
-  providerManager = new WslcProviderManager(extensionContext, telemetryLogger, bridgeConfiguration);
+  providerManager = new WslcProviderManager(
+    extensionContext,
+    telemetryLogger,
+    bridgeConfiguration,
+    new WslcBridgeManager(extensionContext, bridgeConfiguration),
+  );
   const container = new Container();
   container.bind(WslcProviderManager).toConstantValue(providerManager);
   vi.mocked(InversifyBinding.prototype.init).mockResolvedValue(container);

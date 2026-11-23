@@ -18,10 +18,12 @@
 
 import { ContainerModule } from 'inversify';
 import { BridgeConfiguration, bridgeConfiguration } from '/@/config/bridge-config';
+import { WslcBridgeManager } from './wslc-bridge-manager';
 import { WslcProviderManager } from './wslc-provider-manager';
 
 const managersModule = new ContainerModule(options => {
   options.bind<BridgeConfiguration>(BridgeConfiguration).toConstantValue(bridgeConfiguration);
+  options.bind<WslcBridgeManager>(WslcBridgeManager).toSelf().inSingletonScope();
   options.bind<WslcProviderManager>(WslcProviderManager).toSelf().inSingletonScope();
 });
 
