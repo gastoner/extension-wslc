@@ -20,6 +20,7 @@ import type { ExtensionContext, TelemetryLogger } from '@podman-desktop/api';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { InversifyBinding } from './inversify-binding';
 import { ExtensionContextSymbol, TelemetryLoggerSymbol } from './symbol';
+import { WslcProviderManager } from '/@/manager/wslc-provider-manager';
 
 let extensionContext: ExtensionContext;
 let telemetryLogger: TelemetryLogger;
@@ -53,11 +54,12 @@ beforeEach(() => {
 });
 
 describe('InversifyBinding', () => {
-  test('binds the extension context and telemetry logger', async () => {
+  test('loads the manager and its dependencies', async () => {
     const container = await binding.init();
 
     expect(container.get(ExtensionContextSymbol)).toBe(extensionContext);
     expect(container.get(TelemetryLoggerSymbol)).toBe(telemetryLogger);
+    expect(container.get(WslcProviderManager)).toBeInstanceOf(WslcProviderManager);
   });
 
   test('removes container bindings when disposed', async () => {
@@ -67,6 +69,7 @@ describe('InversifyBinding', () => {
 
     expect(container.isBound(ExtensionContextSymbol)).toBeFalsy();
     expect(container.isBound(TelemetryLoggerSymbol)).toBeFalsy();
+    expect(container.isBound(WslcProviderManager)).toBeFalsy();
   });
 
   test('resolves safely when disposed more than once', async () => {
