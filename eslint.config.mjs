@@ -44,6 +44,7 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
 ]);
